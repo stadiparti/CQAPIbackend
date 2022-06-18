@@ -13,7 +13,7 @@ var FCM = require("fcm-push");
 const twilio = require("twilio");
 
 const accountSid = "AC92799ccb3423cc1daacd2585e54700d0";
-const authToken = "fff438c76de04ab0da257d7565fa2a52";
+const authToken = "a95bf98b4fd9da770db63e004a8850ba";
 
 const client = require("twilio")(accountSid, authToken);
 
