@@ -12,8 +12,14 @@ const nodemailer = require("nodemailer");
 var FCM = require("fcm-push");
 const twilio = require("twilio");
 
+/****************PRODUCTION TWILIO *********************
 const accountSid = "AC92799ccb3423cc1daacd2585e54700d0";
 const authToken = "a95bf98b4fd9da770db63e004a8850ba";
+****************PRODUCTION TWILIO *********************/
+
+const accountSid = "TEST";
+const authToken = "TEST";
+
 
 const client = require("twilio")(accountSid, authToken);
 
