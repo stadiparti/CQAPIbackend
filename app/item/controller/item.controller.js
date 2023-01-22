@@ -32,6 +32,7 @@ const setResponseObject =
 const itemModel = require("../model/item.model");
 const authModel = require("../../auth/model/auth.model");
 const groupItem = require("../../group/model/group.item");
+const S3ImageUtil = require('./s3-image-util');
 const {
   SUCCESS,
   BAD_REQUEST,
@@ -50,6 +51,7 @@ const {
   ADMIN,
   UNAUTHORIZED,
 } = require("../../../helpers/constant");
+const s3ImageUtil = new S3ImageUtil();
 // const maxSize = 5 * 1000 * 1024;
 var storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -60,7 +62,7 @@ var storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage: storage }).fields([
+const upload = multer({ storage:  multer.memoryStorage() }).fields([
   { name: "cover_image" },
   { name: "image" },
 ]);
@@ -69,6 +71,42 @@ const upload = multer({ storage: storage }).fields([
 _item.add = async (req, res, next) => {
   try {
     upload(req, res, async (err) => {
+      let coverImageUrl;
+      let imageUrls = [];
+      const formData = req.body;
+      console.log('formData: ', formData);
+     // const coverImage = req.files.cover_image[0];
+      //const images = req.files.image;
+      const coverImage = req.files ? req.files.cover_image[0] : null;
+      const images = req.files ? req.files.image : null;
+     // const coverImageName = `${formData.item_name}-cover-image.jpg`;
+     // const coverImageName = `${formData.item_name}-cover-image.jpg`;
+ const coverImageName = `${s3ImageUtil.uniqueFileName(formData.item_name)}-cover-image.jpg`;
+ if(coverImage || images) {
+  if(coverImage) {
+    try {
+      coverImageUrl = (await s3ImageUtil.upload(coverImage.buffer, coverImageName,'upload/item')).Location.toString();
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({ message: 'Error adding cover image' });
+    }
+  }
+  if(images) {
+    const imageNames = images.map(img => `${s3ImageUtil.uniqueFileName(formData.item_name)}-image-${img.originalname}`);
+    const imageFiles = images.map(img => img.buffer);
+    
+
+    try {
+      imageUrls = (await Promise.all(imageFiles.map((file, index) => s3ImageUtil.upload(file, imageNames[index],'upload/item')))).map(res => res.Location.toString());
+      console.log(imageUrls);
+      //res.status(200).json({ message: 'Item added successfully' });
+    } catch (err) {
+      console.log(err);
+      res.status(500).json({ message: 'Error adding item images' });
+    }
+  }
+}
+
       if (err) {
         if (err.code == "LIMIT_FILE_SIZE") {
           err.message =
@@ -87,13 +125,14 @@ _item.add = async (req, res, next) => {
           data.createdBy = req.userId;
           if (req.files.cover_image) {
             let cover_image = req.files.cover_image[0].path;
-            data.cover_image = cover_image;
+            data.cover_image = coverImageUrl;
           }
 
           let image = [];
+          req.files.image =  imageUrls
           if (req.files.image) {
             req.files.image.map((e) => {
-              image.push({ image: e.path });
+              image.push({ image: e.toString ()});
             });
           }
           data.itemPic = image;
