@@ -46,6 +46,8 @@ const {
   CALC_DISTANCE,
   UNAUTHORIZED
 } = require("../../../helpers/constant");
+const S3ImageUtil = require('../../item/controller/s3-image-util');
+const s3ImageUtil = new S3ImageUtil();
 
 var storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -57,13 +59,16 @@ var storage = multer.diskStorage({
 });
 
 const upload = multer({
-  storage: storage,
+ 
 
   // fileFilter: fileFilter,
 }).single("image");
 
 const _group = {};
-
+const uniqueFileName = (originalName) => {
+  const uniqueString = Date.now() + '-' + Math.random().toString(36).substring(2, 15);
+  return uniqueString + '-' + originalName;
+}
 /**
  * CREATE GROUP
  * @param {token, group_name, description, image, latitude, longitude} req.body
@@ -71,17 +76,7 @@ const _group = {};
  */
 _group.add = async (req, res, next) => {
   try {
-    if (0) {
-      await setResponseObject(req, true, "Group created successfully", {
-        _id: "5f6d80f06883141ca0989276",
-        group_name: "toxsl",
-        group_desc: "JBUGBIUHOINHOIN(*Y(*U(N(J)(",
-        admin_id_no: 76987907098,
-        group_members: [{}],
-        Image: "",
-      });
-      next();
-    } else {
+  
       let numOfGrpCreatedByMe = await groupModel
         .find({ owner_id: req.userId })
         .countDocuments();
@@ -92,12 +87,22 @@ _group.add = async (req, res, next) => {
             setResponseObject(req, false, err.message ? err.message : err, "");
             next();
           } else {
+            let imageUrl;
             let data = req.body;
+            if (req.file) {
+              const file = req.file;
+              const fileName =  uniqueFileName(file.originalname);
+              imageUrl = await s3ImageUtil.upload(file.buffer, fileName,"upload/group");
+              console.log(imageUrl);
+              data.image = imageUrl.Location.toString();
+            }
+            
+            
+           
+           
             data.admin_id = [req.userId];
             data.owner_id = req.userId;
-            if (req.file) {
-              data.image = req.file.path;
-            }
+           
 
             if (data.latitude && data.longitude) {
               data.location = {
@@ -135,7 +140,7 @@ _group.add = async (req, res, next) => {
           message: responseMessage.GROUP_CREATE_LIMIT_EXCEED,
         });
       }
-    }
+    
   } catch (err) {
     await setResponseObject(req, false, responseMessage.SOMETHING_WENT_WRONG, "");
     next();
